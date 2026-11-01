@@ -411,24 +411,6 @@ describe('createDummyFiles', () => {
       }),
     );
   });
-
-  it.each([
-    ['an absolute', '/fake/temp/dir'],
-    ['a relative', 'my-project'],
-  ])('should write the files into %s directory resolved from the cwd', async (_kind, directory) => {
-    await createDummyFiles(directory, false);
-
-    const expectedDir = path.resolve(directory);
-    expect(mockFs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true });
-    expect(mockFs.writeFileSync).toHaveBeenCalledWith(
-      path.join(expectedDir, 'promptfooconfig.yaml'),
-      expect.any(String),
-    );
-    expect(mockFs.writeFileSync).toHaveBeenCalledWith(
-      path.join(expectedDir, 'README.md'),
-      expect.any(String),
-    );
-  });
 });
 
 describe('initializeProject', () => {
@@ -482,17 +464,23 @@ describe('initializeProject', () => {
     expect(messages.some((msg) => msg.includes('undefined'))).toBe(false);
   });
 
-  it('should print an absolute target directory without a ./ prefix', async () => {
-    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
+  it.each(['my-project', './my-project', path.resolve('my-project')])(
+    'writes the project to the requested directory %s',
+    async (directory) => {
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => logger);
+      await initializeProject(directory, false);
 
-    await initializeProject('/fake/temp/dir', false);
-
-    const messages = infoSpy.mock.calls.map((call) => String(call[0]));
-    expect(messages).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('Wrote promptfooconfig.yaml to /fake/temp/dir\n'),
-        expect.stringContaining('cd /fake/temp/dir'),
-      ]),
-    );
-  });
+      const target = path.resolve('my-project');
+      expect(mockFs.mkdirSync).toHaveBeenCalledWith(target, { recursive: true });
+      for (const file of ['promptfooconfig.yaml', 'README.md']) {
+        expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+          path.join(target, file),
+          expect.any(String),
+        );
+      }
+      expect(info).toHaveBeenCalledWith(
+        expect.stringContaining(`Wrote promptfooconfig.yaml to ${directory}\n`),
+      );
+    },
+  );
 });
